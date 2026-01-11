@@ -16,14 +16,14 @@ app = Flask(__name__)
 FILE_PATH = os.environ.get('FILE_PATH', './temp')
 PROJECT_URL = os.environ.get('URL', '') # 填写项目分配的url可实现自动访问，例如：https://www.google.com，留空即不启用该功能
 INTERVAL_SECONDS = int(os.environ.get("TIME", 120))                   # 访问间隔时间，默认120s，单位：秒
-UUID = os.environ.get('UUID', 'abe2f2de-13ae-4f1f-bea5-d6c881ca3888')
+UUID = os.environ.get('UUID', 'b389e09c-4e31-40da-a56c-433f507e615a')
 NEZHA_SERVER = os.environ.get('NEZHA_SERVER', 'nz.abcd.com')        # 哪吒3个变量不全不运行
 NEZHA_PORT = os.environ.get('NEZHA_PORT', '5555')                  # 哪吒端口为443时开启tls
 NEZHA_KEY = os.environ.get('NEZHA_KEY', '')
-DOMAIN = os.environ.get('DOMAIN', 'n1.mcst.io')                 # 分配的域名或反代的域名，不带前缀，例如：n1.mcst.io
-NAME = os.environ.get('NAME', 'Vls')
+DOMAIN = os.environ.get('DOMAIN', 'node2.mephia.fr')                 # 分配的域名或反代的域名，不带前缀，例如：n1.mcst.io
+NAME = os.environ.get('NAME', 'Mephia')
 PORT = int(os.environ.get('PORT', 3000))            # http服务端口
-VPORT = int(os.environ.get('VPORT', 443))          # 节点端口,游戏玩具类需改为分配的端口,并关闭节点的tls
+VPORT = int(os.environ.get('VPORT', 12345))          # 节点端口,游戏玩具类需改为分配的端口,并关闭节点的tls
 
 # Create directory if it doesn't exist
 if not os.path.exists(FILE_PATH):
@@ -174,11 +174,31 @@ def authorize_files(file_paths):
 
 # Generate list and sub info
 def generate_links():
-    meta_info = subprocess.run(['curl', '-s', 'https://speed.cloudflare.com/meta'], capture_output=True, text=True)
-    meta_info = meta_info.stdout.split('"')
-    ISP = f"{meta_info[25]}-{meta_info[17]}".replace(' ', '_').strip()
+    try:
+        # 设置超时时间，避免网络卡死
+        response = requests.get('https://speed.cloudflare.com/meta', timeout=10)
+        # 检查 HTTP 响应状态码，如果不是 200 会抛出异常
+        response.raise_for_status()
+        # 自动解析 JSON 数据
+        data = response.json()
+        # 安全获取字段，使用 .get() 避免键不存在时报错
+        # 原始代码的 [25] 和 [17] 猜测对应的是 'asOrganization' (ISP) 和 'city' 或 'region'
+        # Cloudflare meta 返回的常见字段有: asOrganization, city, country, region
+        org = data.get('asOrganization', 'Unknown_Org')
+        loc = data.get('city', 'Unknown_City') # 或者用 data.get('country')
+    
+        # 构造字符串并处理格式
+        ISP = f"{org}-{loc}".replace(' ', '_').strip()
+        print(f"获取成功: {ISP}")
+    except requests.exceptions.RequestException as e:
+        # 捕获所有网络相关错误
+        print(f"网络请求出错: {e}")
+        ISP = "Error_Fetch"
+    except Exception as e:
+        # 捕获解析错误
+        print(f"数据解析出错: {e}")
+        ISP = "Error_Parse"
     time.sleep(2)
- 
     list_txt = f"""
 vless://{UUID}@{DOMAIN}:{VPORT}?encryption=none&security=tls&sni={DOMAIN}&type=ws&host={DOMAIN}&path=%2Fvless%3Fed%3D2048#{NAME}-{ISP}
   
